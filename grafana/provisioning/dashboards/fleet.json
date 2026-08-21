@@ -1,0 +1,87 @@
+{
+  "uid": "telemetry-fleet",
+  "title": "Fleet Telemetry",
+  "tags": ["telemetry"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-3h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Average temperature by device",
+      "gridPos": { "h": 9, "w": 16, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "celsius" }, "overrides": [] },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "SELECT bucket AS time, device_id AS metric, avg_temp FROM readings_1m WHERE $__timeFilter(bucket) ORDER BY 1",
+          "rawQuery": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Readings ingested (1h)",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT sum(sample_count) AS value FROM readings_1m WHERE bucket > now() - INTERVAL '1 hour'",
+          "rawQuery": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Devices reporting errors (1h)",
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT count(DISTINCT device_id) AS value FROM readings_1m WHERE bucket > now() - INTERVAL '1 hour' AND error_count > 0",
+          "rawQuery": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Voltage spread",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "fieldConfig": { "defaults": { "unit": "volt" }, "overrides": [] },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "SELECT bucket AS time, device_id AS metric, avg_voltage FROM readings_1m WHERE $__timeFilter(bucket) ORDER BY 1",
+          "rawQuery": true
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Hottest devices (1h)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT device_id, round(max(max_temp)::numeric, 1) AS peak_c, round(avg(avg_temp)::numeric, 1) AS avg_c, sum(error_count) AS errors FROM readings_1m WHERE bucket > now() - INTERVAL '1 hour' GROUP BY device_id ORDER BY peak_c DESC LIMIT 15",
+          "rawQuery": true
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

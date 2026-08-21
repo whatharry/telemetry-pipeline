@@ -1,0 +1,62 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: telemetry
+      POSTGRES_PASSWORD: telemetry
+      POSTGRES_DB: telemetry
+    ports:
+      # Host port avoids the common local Postgres on 5432.
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+      # Runs once, only on an empty data volume.
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telemetry -d telemetry"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ingest:
+    build: ./ingest
+    environment:
+      PGHOST: timescaledb
+      PGUSER: telemetry
+      PGPASSWORD: telemetry
+      PGDATABASE: telemetry
+      PG_POOL_MAX: 20
+      MAX_BATCH: 1000
+    ports:
+      - "${INGEST_PORT:-3010}:3000"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  generator:
+    build: ./generator
+    environment:
+      INGEST_URL: http://ingest:3000
+    command: ["--devices", "200", "--interval", "1.0"]
+    depends_on:
+      - ingest
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_DEFAULT_THEME: light
+    ports:
+      - "${GRAFANA_PORT:-3011}:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - timescaledb
+
+volumes:
+  timescale-data:
