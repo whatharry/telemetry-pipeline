@@ -172,6 +172,16 @@ docker compose run --rm generator --devices 1000 --interval 0.5
 | `GET` | `/devices/:id/stats?hours=24` | Per-device rollup from the aggregate |
 | `GET` | `/health` | Liveness plus pool saturation |
 
+## Deploying to AWS
+
+`infra/` contains Terraform for an ECS Fargate deployment: ALB, RDS Postgres, Secrets Manager,
+CloudWatch alarms, and a GitHub Actions pipeline authenticating via OIDC rather than stored AWS
+keys. Roughly $25/month, mostly the load balancer.
+
+One caveat stated up front: **RDS does not offer the TimescaleDB extension**, so the schema
+degrades to plain Postgres there — no hypertables or continuous aggregates. `infra/README.md`
+covers the three ways around that and why this one was chosen.
+
 ## Limitations
 
 Worth stating plainly, since none of these are oversights:
